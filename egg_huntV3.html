@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск пасхальных яиц</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #c9e4ff;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #ff6b6b;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+            margin: 20px auto;
+            background-color: #8cbc65;
+            border: 3px solid #88c1ff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .egg {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background-image: radial-gradient(ellipse at center, #ffeb3b, #ff9800);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            opacity: 0.9;
+            transform: rotate(20deg);
+            transition: transform 0.3s ease;
+            z-index: 5; /* Яйца будут находиться между слоями травы */
+        }
+        
+        .egg:hover {
+            transform: scale(1.1) rotate(20deg);
+        }
+        
+        .egg::before {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 30%;
+            width: 40%;
+            height: 20%;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+        }
+        
+        .found {
+            animation: foundEgg 1s forwards;
+        }
+        
+        @keyframes foundEgg {
+            0% { transform: scale(1) rotate(20deg); }
+            50% { transform: scale(1.5) rotate(20deg); opacity: 0.8; }
+            100% { transform: scale(0) rotate(20deg); opacity: 0; }
+        }
+        
+        /* Стили для травы */
+        .grass-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Чтобы трава не мешала кликать по яйцам */
+        }
+        
+        .grass-layer.back {
+            z-index: 2; /* Задний слой травы */
+        }
+        
+        .grass-layer.middle {
+            z-index: 6; /* Средний слой травы, перед яйцами */
+        }
+        
+        .grass-layer.front {
+            z-index: 8; /* Передний слой травы */
+        }
+        
+        .grass-cluster {
+            position: absolute;
+            pointer-events: none;
+        }
+        
+        .grass-blade {
+            position: absolute;
+            background-color: #4a8e35;
+            width: 8px;
+            transform-origin: bottom center;
+            border-radius: 3px 3px 0 0;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        .grass-blade.back {
+            height: 40px;
+            opacity: 0.7;
+        }
+        
+        .grass-blade.middle {
+            height: 60px;
+            opacity: 0.85;
+        }
+        
+        .grass-blade.front {
+            height: 80px;
+            opacity: 1;
+        }
+        
+        #score-container {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+        
+        #timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #ff4f4f;
+        }
+        
+        #message {
+            font-size: 1.5rem;
+            font-weight: bold;
+            height: 30px;
+            margin: 10px 0;
+            color: #4caf50;
+        }
+        
+        .difficulty-buttons {
+            margin-bottom: 10px;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            z-index: 20;
+            display: none;
+        }
+        
+        #confetti {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <h1>Поиск пасхальных яиц</h1>
+    
+    <div id="score-container">
+        Найдено: <span id="found-count">0</span> из <span id="total-eggs">0</span>
+    </div>
+    
+    <div id="timer">60</div>
+    
+    <div class="difficulty-buttons">
+        <button onclick="setDifficulty('easy')">Легкий</button>
+        <button onclick="setDifficulty('medium')">Средний</button>
+        <button onclick="setDifficulty('hard')">Сложный</button>
+    </div>
+    
+    <button id="start-button" onclick="startGame()">Начать игру</button>
+    
+    <div id="message"></div>
+    
+    <div id="game-container">
+        <div id="game-over">
+            <div id="final-message"></div>
+            <button onclick="startGame()">Играть снова</button>
+        </div>
+        <canvas id="confetti"></canvas>
+    </div>
+    
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const foundCountElement = document.getElementById('found-count');
+        const totalEggsElement = document.getElementById('total-eggs');
+        const timerElement = document.getElementById('timer');
+        const messageElement = document.getElementById('message');
+        const gameOverElement = document.getElementById('game-over');
+        const finalMessageElement = document.getElementById('final-message');
+        const startButton = document.getElementById('start-button');
+        
+        // Используем let вместо const для этих переменных, так как они будут переопределяться
+        let confettiCanvas = document.getElementById('confetti');
+        let confettiCtx = confettiCanvas.getContext('2d');
+        
+        let eggs = [];
+        let foundEggs = 0;
+        let totalEggs = 0;
+        let timeLeft = 60;
+        let timerInterval;
+        let difficulty = 'medium';
+        let isGameRunning = false;
+        let confettiParticles = [];
+        
+        // Настройки уровней сложности
+        const difficultySettings = {
+            easy: { eggs: 5, time: 30, grassDensity: 15 },
+            medium: { eggs: 8, time: 25, grassDensity: 25 },
+            hard: { eggs: 12, time: 15, grassDensity: 40 }
+        };
+        
+        // Устанавливаем размер холста для конфетти
+        function resizeCanvas() {
+            confettiCanvas.width = gameContainer.offsetWidth;
+            confettiCanvas.height = gameContainer.offsetHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // Создаем траву
+        function createGrass() {
+            // Создаем три слоя травы: задний, средний и передний
+            const layers = ['back', 'middle', 'front'];
+            const gameWidth = gameContainer.offsetWidth;
+            const gameHeight = gameContainer.offsetHeight;
+            
+            // Определяем плотность травы в зависимости от выбранной сложности
+            const grassDensity = difficultySettings[difficulty].grassDensity;
+            
+            layers.forEach(layer => {
+                const grassLayer = document.createElement('div');
+                grassLayer.classList.add('grass-layer', layer);
+                
+                // Создаем кластеры травы по всему полю
+                for (let i = 0; i < grassDensity; i++) {
+                    const grassCluster = document.createElement('div');
+                    grassCluster.classList.add('grass-cluster');
+                    
+                    // Случайная позиция для кластера травы
+                    const posX = Math.random() * gameWidth;
+                    const posY = Math.random() * gameHeight;
+                    
+                    grassCluster.style.left = `${posX}px`;
+                    grassCluster.style.top = `${posY}px`;
+                    
+                    // Количество травинок в кластере
+                    const bladesInCluster = 3 + Math.floor(Math.random() * 4);
+                    
+                    for (let j = 0; j < bladesInCluster; j++) {
+                        const blade = document.createElement('div');
+                        blade.classList.add('grass-blade', layer);
+                        
+                        // Позиция в пределах кластера
+                        const localPosX = (Math.random() - 0.5) * 20; ////////////////////
+                        blade.style.left = `${localPosX}px`;
+                        
+                        // Случайный наклон
+                        const rotation = Math.random() * 40 - 20;
+                        blade.style.transform = `rotate(${rotation}deg)`;
+                        
+                        // Случайный оттенок зеленого
+                        const hue = 90 + Math.random() * 60;
+                        const saturation = 60 + Math.random() * 40;
+                        const lightness = 25 + Math.random() * 20;
+                        blade.style.backgroundColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                        
+                        // Случайная ширина травинки
+                        const width = 4 + Math.random() * 4;
+                        blade.style.width = `${width}px`;
+                        
+                        grassCluster.appendChild(blade);
+                    }
+                    
+                    grassLayer.appendChild(grassCluster);
+                }
+                
+                gameContainer.appendChild(grassLayer);
+            });
+        }
+        
+        // Установка сложности игры
+        function setDifficulty(level) {
+            if (!isGameRunning) {
+                difficulty = level;
+                messageElement.textContent = `Выбран ${level === 'easy' ? 'легкий' : level === 'medium' ? 'средний' : 'сложный'} уровень`;
+                messageElement.style.color = '#4caf50';
+            }
+        }
+        
+        // Создать яйцо на случайной позиции
+        function createEgg() {
+            const egg = document.createElement('div');
+            egg.className = 'egg';
+            
+            // Случайные позиции с учетом размеров контейнера и яйца
+            const maxX = gameContainer.offsetWidth - 40;
+            const maxY = gameContainer.offsetHeight - 50;
+            const posX = Math.floor(Math.random() * maxX);
+            const posY = Math.floor(Math.random() * maxY);
+            
+            egg.style.left = `${posX}px`;
+            egg.style.top = `${posY}px`;
+            
+            // Случайный цвет яйца
+            const hue = Math.floor(Math.random() * 360);
+            egg.style.backgroundImage = `radial-gradient(ellipse at center, hsl(${hue}, 100%, 70%), hsl(${hue}, 100%, 50%))`;
+            
+            // Случайный наклон
+            const rotation = Math.floor(Math.random() * 60) - 30;
+            egg.style.transform = `rotate(${rotation}deg)`;
+            
+            egg.addEventListener('click', function() {
+                if (!egg.classList.contains('found')) {
+                    egg.classList.add('found');
+                    foundEggs++;
+                    foundCountElement.textContent = foundEggs;
+                    
+                    if (foundEggs === totalEggs) {
+                        clearInterval(timerInterval);
+                        showVictoryMessage();
+                    }
+                }
+            });
+            
+            return egg;
+        }
+        
+        // Начало игры
+        function startGame() {
+            // Остановить таймер если игра уже запущена
+            if (isGameRunning) {
+                clearInterval(timerInterval);
+            }
+            
+            // Очистить предыдущую игру
+            gameContainer.innerHTML = '<canvas id="confetti"></canvas>';
+            
+            // Переопределяем эти элементы после обновления DOM
+            confettiCanvas = document.getElementById('confetti');
+            confettiCtx = confettiCanvas.getContext('2d');
+            resizeCanvas();
+            
+            // Создаем траву
+            createGrass();
+            
+            // Сбросить состояние игры
+            eggs = [];
+            foundEggs = 0;
+            confettiParticles = [];
+            isGameRunning = true;
+            gameOverElement.style.display = 'none';
+            
+            // Установить настройки в зависимости от сложности
+            const settings = difficultySettings[difficulty];
+            totalEggs = settings.eggs;
+            timeLeft = settings.time;
+            
+            // Обновить UI
+            foundCountElement.textContent = foundEggs;
+            totalEggsElement.textContent = totalEggs;
+            timerElement.textContent = timeLeft;
+            messageElement.textContent = 'Ищите пасхальные яйца!';
+            messageElement.style.color = '#4caf50';
+            
+            // Создать яйца
+            for (let i = 0; i < totalEggs; i++) {
+                const egg = createEgg();
+                gameContainer.appendChild(egg);
+                eggs.push(egg);
+                
+                // Перемещаем яйцо на правильный z-index (между слоями травы)
+                egg.style.zIndex = '5';
+            }
+            
+            // Запустить таймер
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        // Обновление таймера
+        function updateTimer() {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+            
+            if (timeLeft <= 10) {
+                timerElement.style.color = '#ff0000';
+            }
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                gameOver();
+            }
+        }
+        
+        // Завершение игры
+        function gameOver() {
+            isGameRunning = false;
+            
+            // Показать все оставшиеся яйца
+            eggs.forEach(egg => {
+                if (!egg.classList.contains('found')) {
+                    egg.style.opacity = '1';
+                    egg.style.border = '2px solid red';
+                    egg.style.zIndex = '10'; // Поднимаем яйца поверх травы, чтобы их было видно
+                }
+            });
+            
+            gameOverElement.style.display = 'flex';
+            finalMessageElement.textContent = `Время вышло! Вы нашли ${foundEggs} из ${totalEggs} яиц`;
+        }
+        
+        // Показать сообщение о победе
+        function showVictoryMessage() {
+            isGameRunning = false;
+            messageElement.textContent = 'Поздравляем! Вы нашли все яйца!';
+            messageElement.style.color = '#ff6b6b';
+            createConfetti();
+            
+            gameOverElement.style.display = 'flex';
+            finalMessageElement.textContent = `Победа! Вы нашли все ${totalEggs} яиц за ${difficultySettings[difficulty].time - timeLeft} секунд!`;
+        }
+        
+        // Конфетти для победного экрана
+        function createConfetti() {
+            for (let i = 0; i < 150; i++) {
+                confettiParticles.push({
+                    x: Math.random() * confettiCanvas.width,
+                    y: -20,
+                    size: Math.random() * 6 + 3,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    velocity: {
+                        x: Math.random() * 4 - 2,
+                        y: Math.random() * 3 + 2
+                    },
+                    rotation: 0,
+                    rotationSpeed: Math.random() * 0.2 - 0.1
+                });
+            }
+            
+            animateConfetti();
+        }
+        
+        function animateConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            
+            confettiParticles.forEach((particle, index) => {
+                particle.x += particle.velocity.x;
+                particle.y += particle.velocity.y;
+                particle.rotation += particle.rotationSpeed;
+                
+                // Удаляем частицы, которые вышли за пределы экрана
+                if (particle.y > confettiCanvas.height) {
+                    confettiParticles.splice(index, 1);
+                    return;
+                }
+                
+                confettiCtx.save();
+                confettiCtx.translate(particle.x, particle.y);
+                confettiCtx.rotate(particle.rotation);
+                confettiCtx.fillStyle = particle.color;
+                confettiCtx.fillRect(-particle.size/2, -particle.size/2, particle.size, particle.size);
+                confettiCtx.restore();
+            });
+            
+            if (confettiParticles.length > 0) {
+                requestAnimationFrame(animateConfetti);
+            }
+        }
+        
+        // Устанавливаем средний уровень сложности по умолчанию
+        setDifficulty('medium');
+    </script>
+</body>
+</html>
